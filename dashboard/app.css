@@ -1,0 +1,56 @@
+:root{--bg:#0a1120;--panel:#101c30;--panel2:#0d1728;--line:#1e3252;--ink:#e8eef7;--mut:#8fa3bd;--acc:#2dd4a7;--acc2:#f5b942;--red:#f26d6d;--grn:#3ddc97}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+a{color:var(--acc)}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 48px}
+header h1{font-size:30px;margin:0 0 4px;letter-spacing:-.5px}
+header h1 b{color:var(--acc)}
+header p.sub{color:var(--mut);margin:0 0 18px;max-width:820px}
+.stats{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 18px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;min-width:130px}
+.stat b{display:block;font-size:22px;color:var(--acc)}
+.stat span{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+.method{background:var(--panel2);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:10px;padding:14px 16px;margin:0 0 18px}
+.method h2{margin:0 0 6px;font-size:15px}
+.method p{margin:4px 0;color:#c6d3e6;font-size:14px}
+.method code{background:#0a1120;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:var(--acc2)}
+.tabs{display:flex;gap:8px;margin:0 0 14px}
+.tabs button{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-size:14px;cursor:pointer}
+.tabs button.on{background:var(--acc);color:#06251c;border-color:var(--acc);font-weight:700}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin:0 0 14px}
+.controls input[type=search],.controls select{background:#0a1120;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px}
+.controls input[type=search]{flex:1;min-width:180px}
+.controls label{color:var(--mut);font-size:13px;display:flex;gap:6px;align-items:center}
+.count{color:var(--mut);font-size:13px;margin:0 0 10px}
+table{width:100%;border-collapse:collapse;background:var(--panel);border-radius:10px;overflow:hidden}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);font-size:14px}
+thead th{background:#132238;color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;white-space:nowrap}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:#16294a}
+tbody tr.sel{background:#173a2e}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td .slug{color:var(--mut);font-size:12px}
+td .cat{color:var(--mut);font-size:12px}
+.badge{display:inline-block;background:#123b2e;color:var(--acc);border:1px solid #1f6b4d;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700}
+.up{color:var(--grn)}.down{color:var(--red)}
+.detail{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;margin:18px 0}
+.detail h2{margin:0 0 2px;font-size:22px}
+.detail .meta{color:var(--mut);font-size:13px;margin:0 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 14px}
+.cell{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.cell b{display:block;font-size:17px}
+.cell span{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.detail h3{margin:16px 0 8px;font-size:15px;color:var(--acc)}
+.detail ol{margin:0;padding-left:22px}
+.detail ol li{margin:8px 0}
+.detail ol li b{color:var(--acc2)}
+.model{font-size:13px;color:#c6d3e6;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.model code{color:var(--acc2)}
+.note{color:var(--mut);font-size:13px}
+footer{color:var(--mut);font-size:13px;margin-top:28px;border-top:1px solid var(--line);padding-top:14px}
+.empty{padding:28px;text-align:center;color:var(--mut)}
+.mult{margin:10px 0 2px}
+.mult table{background:var(--panel2)}
+.mult td,.mult th{padding:6px 10px;font-size:13px}
+.mult td.num{color:var(--acc2)}
+@media (max-width:720px){header h1{font-size:23px}th:nth-child(5),td:nth-child(5),th:nth-child(6),td:nth-child(6){display:none}}
