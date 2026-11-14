@@ -7,7 +7,75 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<main id="board" aria-busy="true"></main>
+<div class="page">
+  <header class="masthead">
+    <div class="masthead-inner">
+      <div class="brand"><span class="brand-dot" aria-hidden="true"></span><span class="brand-word">Token&nbsp;Radar</span></div>
+      <p class="masthead-note" id="snapshot-note">Snapshot loading…</p>
+    </div>
+  </header>
+
+  <main class="wrap" id="app" aria-busy="true">
+    <section class="hero">
+      <div>
+        <p class="kicker">Token launch radar · model radar-2</p>
+        <h1 id="hero-title">Which pre-token protocol is worth farming next?</h1>
+        <p class="lede" id="hero-lede">Ranking every protocol that records no token yet by what its launch would be worth, priced from the market's own multiples.</p>
+      </div>
+      <dl class="stats" id="stats"></dl>
+    </section>
+
+    <section class="toolbar" aria-label="Board controls">
+      <label class="ctl">Search
+        <input type="search" id="q" placeholder="Name, category or chain" autocomplete="off">
+      </label>
+      <label class="ctl">Category
+        <select id="cat" aria-label="Filter by category"></select>
+      </label>
+      <div class="ctl"><span class="ctl-label">Board</span>
+        <div class="seg" role="group" aria-label="Token status">
+          <button type="button" id="tab-pre" aria-pressed="true">Pre-token</button>
+          <button type="button" id="tab-live" aria-pressed="false">Live token</button>
+        </div>
+      </div>
+      <label class="ctl">Sort by
+        <select id="sort" aria-label="Sort the board">
+          <option value="implied">Implied value</option>
+          <option value="tvl">TVL</option>
+          <option value="growth">7-day growth</option>
+          <option value="age">Age</option>
+          <option value="name">Name</option>
+        </select>
+      </label>
+      <p class="rowcount" id="rowcount"></p>
+    </section>
+
+    <div class="chips" id="chips" aria-label="Quick category filters"></div>
+
+    <section class="board" id="board" aria-live="polite"></section>
+
+    <section class="method" id="method" aria-labelledby="method-title">
+      <h2 id="method-title">How the implied value is priced</h2>
+      <p>One function scores every row, from the snapshot's own figures — never from a hand-kept list of names. A protocol's implied value is its TVL times the multiple the market already pays for its category, adjusted for growth, maturity, chain breadth and youth.</p>
+      <p class="formula" id="formula"></p>
+      <p id="method-notes"></p>
+      <h3>Category multiples, calibrated from this snapshot</h3>
+      <p class="sub">Each multiple is the median market-cap-to-TVL ratio of the live-token protocols in that category. A category with fewer than four live protocols is priced at the global median instead.</p>
+      <div class="mult-wrap"><table class="mult" id="mult-table">
+        <thead><tr><th scope="col">Category</th><th scope="col">Multiple</th><th scope="col">Live protocols</th><th scope="col">Source</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <p class="sub" id="recompute-note"></p>
+    </section>
+
+    <footer class="foot">
+      <p>Implied value is this radar's own estimate, not a price and not a promise. “Records no token” means the snapshot records none — it is not proof a protocol has none. Farm plans are a starting point: check the protocol's own pages before you move funds.</p>
+    </footer>
+  </main>
+</div>
+
+<dialog class="detail" id="detail" aria-labelledby="detail-title"></dialog>
+
 <script src="../data.js"></script>
 <script src="app.js"></script>
 </body>
