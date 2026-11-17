@@ -18,11 +18,23 @@
   <main class="wrap" id="app" aria-busy="true">
     <section class="hero">
       <div>
-        <p class="kicker">Token launch radar · model radar-2</p>
+        <p class="kicker">Token launch radar · model radar-3</p>
         <h1 id="hero-title">Which pre-token protocol is worth farming next?</h1>
         <p class="lede" id="hero-lede">Ranking every protocol that records no token yet by what its launch would be worth, priced from the market's own multiples.</p>
       </div>
       <dl class="stats" id="stats"></dl>
+    </section>
+
+    <section class="validation" id="validation" aria-labelledby="validation-title">
+      <h2 id="validation-title">Model validation — tested, not asserted</h2>
+      <p id="validation-method"></p>
+      <div class="mult-wrap"><table class="mult" id="fold-table">
+        <thead><tr><th scope="col">Held-out window</th><th scope="col" class="num">Train</th><th scope="col" class="num">Test</th><th scope="col" class="num">Mcap Spearman</th><th scope="col" class="num">Ratio Spearman</th><th scope="col" class="num">MdAPE</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <p class="sub" id="validation-selection"></p>
+      <p class="sub" id="validation-ranges"></p>
+      <p class="sub" id="validation-verdict"></p>
     </section>
 
     <section class="toolbar" aria-label="Board controls">
@@ -66,6 +78,12 @@
         <tbody></tbody>
       </table></div>
       <p class="sub" id="recompute-note"></p>
+      <h3>Candidate configurations the walk-forward test compared</h3>
+      <p class="sub">Five ways to price the same protocols, each calibrated on the training folds only and scored on protocols it never saw. Mean held-out Spearman is the ranking test; the ratio column is the market-cap-to-TVL ratio test, and MdAPE is the median absolute error on market cap. The ratio is not predictable from these figures — every candidate scores near zero on it — and the ranking is carried by TVL scale: even TVL times one global median ranks held-out market caps at 0.23.</p>
+      <div class="mult-wrap"><table class="mult" id="cand-table">
+        <thead><tr><th scope="col">Configuration</th><th scope="col" class="num">Mcap Spearman</th><th scope="col" class="num">Ratio Spearman</th><th scope="col" class="num">MdAPE</th><th scope="col">Kept?</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
     </section>
 
     <footer class="foot">

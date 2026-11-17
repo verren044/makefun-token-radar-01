@@ -157,7 +157,7 @@
         onclick: function () { openDetail(r.slug); },
         onkeydown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(r.slug); } }
       },
-        h('td', { cls: 'num', txt: String(r.rank) }),
+        h('td', { cls: 'num' }, h('b', { txt: String(r.rank) }), h('div', { cls: 'rank-range', txt: r.rank_lo + '–' + r.rank_hi })),
         h('td', null, h('div', { cls: 'name' },
           h('b', { txt: r.name }),
           h('span', { txt: (r.category || 'Uncategorised') + ' · ' + (r.chains && r.chains.length ? r.chains.slice(0, 2).join(', ') : 'an unnamed chain') })
@@ -170,13 +170,14 @@
           h('div', { cls: 'bar', 'aria-hidden': 'true' }, h('i', { style: 'width:' + Math.max(3, Math.round((r.implied_value_usd / max) * 100)) + '%' })),
           h('span', { cls: 'num', txt: usd(r.implied_value_usd) })
         )),
+        h('td', null, h('span', { cls: 'verdict verdict-' + r.verdict.toLowerCase(), txt: r.verdict })),
         h('td', null, h('span', { cls: 'tag', txt: 'no token' }))
       );
       tbody.appendChild(tr);
     });
     return h('div', { cls: 'table-wrap' },
       h('table', { cls: 'grid' },
-        h('caption', { txt: 'Pre-token protocols, strongest implied value first. Select a row for its model and farm plan.' }),
+        h('caption', { txt: 'Pre-token protocols, strongest implied value first. Ranks carry bootstrap p10–p90 ranges; verdicts price the farm (FARM / THIN / SKIP). Select a row for detail.' }),
         h('thead', null, h('tr', null,
           sortButton('implied', 'Rank'),
           sortButton('name', 'Protocol'),
@@ -185,6 +186,7 @@
           sortButton('age', 'Age'),
           h('th', { scope: 'col', txt: 'Multiple' }),
           sortButton('implied', 'Implied value'),
+          h('th', { scope: 'col', txt: 'Verdict' }),
           h('th', { scope: 'col', txt: 'Token' })
         )),
         tbody
@@ -235,7 +237,7 @@
       var c = r.category || 'Uncategorised';
       counts[c] = (counts[c] || 0) + 1;
     });
-    var top = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).slice(0, 8);
+    var top = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).slice(0, 6);
     ['all'].concat(top).forEach(function (c) {
       var label = c === 'all' ? 'All categories' : c;
       var n = c === 'all' ? DATA.board_size : counts[c];
@@ -273,7 +275,7 @@
     var body = h('div', { cls: 'detail-body' },
       h('div', { cls: 'detail-head' },
         h('div', null,
-          h('span', { cls: 'rank', txt: 'Rank ' + row.rank + ' of ' + DATA.board_size }),
+          h('span', { cls: 'rank', txt: 'Rank ' + row.rank + ' of ' + DATA.board_size + ' · bootstrap range ' + row.rank_lo + '–' + row.rank_hi }),
           h('h2', { id: 'detail-title', txt: row.name }),
           h('p', { cls: 'sub', txt: (row.category || 'Uncategorised') + ' · ' + (row.chains && row.chains.length ? row.chains.join(', ') : 'an unnamed chain') })
         ),
@@ -288,13 +290,15 @@
         h('div', null, h('span', { txt: 'Maturity multiplier' }), h('b', { txt: f.maturity_mult.toFixed(4) + 'x' })),
         h('div', null, h('span', { txt: 'Chain multiplier' }), h('b', { txt: f.chain_mult.toFixed(4) + 'x' })),
         h('div', null, h('span', { txt: 'Youth multiplier' }), h('b', { txt: f.youth_mult.toFixed(2) + 'x' })),
-        h('div', null, h('span', { txt: 'Implied value' }), h('b', { txt: usd(row.implied_value_usd) }))
+        h('div', null, h('span', { txt: 'Implied value' }), h('b', { txt: usd(row.implied_value_usd) })),
+        h('div', null, h('span', { txt: 'Farm verdict' }), h('b', { txt: row.verdict + ' · ' + usd(row.stake_usd) + ' staked' }))
       ),
       h('p', { cls: 'sub' }, 'Model ' + DATA.model_version + ': the page recomputes this row as ',
         h('b', { txt: usd(recomputed) }),
         matches ? h('span', { cls: 'match-ok', txt: ' — the same number the board carries.' }) : h('span', { cls: 'match-bad', txt: ' — which differs from the board.' }),
         ' This is an estimate, not a price.'
       ),
+      h('p', { cls: 'sub', txt: DATA.validation.verdict_rule }),
       h('h3', { txt: 'Farm plan' }),
       h('ol', { cls: 'steps' }, row.farm_steps.map(function (s) {
         var at = s.indexOf(' Cost: ');
@@ -317,7 +321,7 @@
   function renderStatic() {
     document.getElementById('snapshot-note').textContent = 'Snapshot ' + DATA.as_of + ' · DefiLlama protocol index · model ' + DATA.model_version;
     document.getElementById('hero-title').textContent = DATA.watchlist_size + ' watchlist protocols, ranked by implied value';
-    document.getElementById('hero-lede').textContent = 'The watchlist is the floor: every protocol with at least $' + Math.round(DATA.floor_usd / 1e6) + 'M of TVL and no token on record. The early radar adds ' + DATA.early_size + ' pre-token protocols below that floor. Implied value is a model, not a promise.';
+    document.getElementById('hero-lede').textContent = 'The watchlist is the floor: every protocol with at least $' + Math.round(DATA.floor_usd / 1e6) + 'M of TVL and no token on record, plus ' + DATA.early_size + ' early rows below that floor. Implied value is a model, not a promise.';
     var stats = document.getElementById('stats');
     var top = DATA.rows[0];
     [
@@ -361,6 +365,42 @@
     });
     document.getElementById('recompute-note').textContent =
       'The page recomputes every row from the snapshot figures: ' + MISMATCHES + ' mismatches out of ' + DATA.rows.length + ' rows.';
+
+    var v = DATA.validation;
+    var sel = null;
+    v.candidates.forEach(function (c) { if (c.name === v.selected) sel = c; });
+    document.getElementById('validation-method').textContent = v.method;
+    var fbody = document.querySelector('#fold-table tbody');
+    (sel || v.candidates[0]).folds.forEach(function (f) {
+      fbody.appendChild(h('tr', null,
+        h('td', { txt: f.window }),
+        h('td', { cls: 'num', txt: String(f.train_n) }),
+        h('td', { cls: 'num', txt: String(f.test_n) }),
+        h('td', { cls: 'num', txt: f.mcap_spearman.toFixed(3) }),
+        h('td', { cls: 'num', txt: f.ratio_spearman === null ? 'n/a' : f.ratio_spearman.toFixed(3) }),
+        h('td', { cls: 'num', txt: f.mdape === null ? 'n/a' : f.mdape.toFixed(1) + '%' })
+      ));
+    });
+    document.getElementById('validation-selection').textContent =
+      'Kept: ' + v.selected + ' — ' + v.selection_rule +
+      ' Mean held-out: mcap Spearman ' + (sel ? sel.mean_mcap_spearman.toFixed(3) : 'n/a') +
+      ', ratio Spearman ' + (sel && sel.mean_ratio_spearman !== null ? sel.mean_ratio_spearman.toFixed(3) : 'n/a') +
+      ', MdAPE ' + (sel && sel.mean_mdape !== null ? sel.mean_mdape.toFixed(1) + '%' : 'n/a') + '.';
+    document.getElementById('validation-ranges').textContent =
+      'Rank ranges (200 bootstrap refits): median p90–p10 width ' + v.rank_ranges.median_width +
+      ' of ' + DATA.board_size + ' ranks (p25 ' + v.rank_ranges.p25_width + ', p75 ' + v.rank_ranges.p75_width + '); only ' +
+      v.rank_ranges.tight_rows + ' rows hold a range of 5 or less — the top is firm, the middle is not.';
+    document.getElementById('validation-verdict').textContent = v.verdict_rule;
+    var cbody = document.querySelector('#cand-table tbody');
+    v.candidates.forEach(function (c) {
+      cbody.appendChild(h('tr', null,
+        h('td', { txt: c.name }),
+        h('td', { cls: 'num', txt: c.mean_mcap_spearman.toFixed(3) }),
+        h('td', { cls: 'num', txt: c.mean_ratio_spearman === null ? 'n/a' : c.mean_ratio_spearman.toFixed(3) }),
+        h('td', { cls: 'num', txt: c.mean_mdape === null ? 'n/a' : c.mean_mdape.toFixed(1) + '%' }),
+        h('td', { txt: c.name === v.selected ? 'Kept' : '—' })
+      ));
+    });
   }
 
   readHash();

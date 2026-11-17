@@ -99,6 +99,16 @@ table.grid tbody tr[data-selected="true"] { background: #e4efe9; }
 }
 .btn:hover { background: var(--teal-dark); }
 
+.validation { margin: 4px 0 16px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 18px; }
+.validation h2 { font-size: 20px; margin-bottom: 4px; }
+.validation p { margin: 5px 0; }
+.validation table.mult td, .validation table.mult th { padding: 4px 10px; }
+.rank-range { font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.verdict { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 20px; white-space: nowrap; }
+.verdict-farm { background: #dcefe2; color: #1e5c33; }
+.verdict-thin { background: #f7e8c8; color: #7a4a12; }
+.verdict-skip { background: #e8e4da; color: #5c6670; }
+
 .method { margin-top: 22px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; }
 .method h2 { font-size: 24px; margin-bottom: 8px; }
 .method h3 { font-size: 18px; margin: 18px 0 6px; }
