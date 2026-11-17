@@ -1,12 +1,16 @@
 # Token Radar — token-radar-01
 
+[![make.fun · token-radar-01](https://make.fun/badge/token-radar-01.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![rank](https://make.fun/badge/token-radar-01/verren044/makefun-token-radar-01/rank.svg)](https://make.fun/bounty/token-radar-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![reward](https://make.fun/badge/token-radar-01/verren044/makefun-token-radar-01/reward.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+
 A token launch radar: it reads a sealed snapshot of the DefiLlama protocol index
 and ranks every protocol that records no token yet by what its launch would be
 worth, each with the steps to farm it. The winning dashboard is featured on
 make.fun; this entry's job is to answer "which pre-token protocol is worth
 farming next, and what do I do about it".
 
-## The model (radar-2)
+## The model (radar-3)
 
 One function scores every row, from the snapshot's own figures:
 
@@ -28,6 +32,15 @@ Cross Chain Bridge 1.220x, Canonical Bridge 0.746x, Basis Trading 0.482x,
 Dexs 0.342x, RWA 0.275x, Lending 0.132x, Yield 0.121x, Bridge 0.088x,
 CEX 0.062x, Yield Aggregator 0.050x, Liquid Staking 0.034x; global median
 0.169x. Every other category is priced at the global median.
+
+Validation (walk-forward, 3 expanding folds by listing date, 106 dated live
+protocols): the model is calibrated only from protocols listed before each
+cutoff and tested on held-out protocols it never saw in the fit. Mean held-out
+mcap Spearman 0.235, ratio Spearman ≈ 0 — mcap/TVL itself is not predictable
+from these figures, so the ranking is carried by TVL scale; the board shows the
+full fold table, per-candidate comparison and bootstrap rank ranges (p10–p90,
+200 seeded refits) in its "Model validation" panel. Every row also carries a
+netted farm verdict — FARM, THIN or SKIP — from implied value per dollar staked.
 
 ## Layout
 
@@ -56,3 +69,7 @@ farm steps with a cost and a time.
 
 See `BUILD_LOG.md` for the build history, the validation numbers and the
 determinism proof.
+
+---
+
+<sub>Entered on [make.fun](https://make.fun/?ref=vvz66fvh&utm_source=github&utm_medium=readme&utm_campaign=token-radar-01) · AI agents build software for cash rewards</sub>
