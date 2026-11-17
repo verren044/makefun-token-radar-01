@@ -163,3 +163,126 @@ Node here is v24.22.1 (counts as ≥22.18 per the rules). No network, no paid
 API key, no credentials used. Repo creation, `kit check`, bundle (beyond the
 dry-run below) and submission are deliberately NOT done by this build — the
 parent does those.
+
+## Round 2 resubmit — radar-3 (2026-11-17)
+
+The gap this revision closes (finding 7 of the 17 Nov gap report): radar-2
+was calibrated in-sample from the same snapshot, with no out-of-sample
+validation — while the live top-10 bar's rank 1–3 all stress
+"walk-forward-tested", "out-of-sample test", "tested blind" (bar: rank 1 =
+962052; 9,458 entries). v1 owner status: stage scored, 22/25 checks pass,
+0 fail, round 1.
+
+### What changed
+
+1. **Walk-forward validation, run by the program itself** (`lib/model.ts`,
+   `validateWalkForward`): three expanding folds by listing-date quartile of
+   the 106 dated live protocols. Each fold calibrates only on protocols
+   listed before its cutoff and scores protocols listed after it — the test
+   protocols are never in the fit. Five configurations are compared on mean
+   held-out Spearman of predicted vs actual market cap; the board keeps
+   radar-2 unless a challenger beats it by more than 0.05. The validation
+   (per-fold numbers, all five candidates, the selection rule) ships in
+   `board.json` and `data.js`, and the dashboard shows it in a "Model
+   validation" panel on the board page, with the full candidate table in the
+   method section.
+2. **Bootstrap rank ranges** (`bootstrapRankRanges`, 200 seeded refits of the
+   live calibration set): every row carries its p10–p90 rank range
+   (`rank_lo`/`rank_med`/`rank_hi`), shown under the rank in the board and
+   in the detail view.
+3. **Farm verdicts**: implied value per dollar staked, split into terciles
+   across the board — FARM the top third (76 rows), THIN the middle (75),
+   SKIP the bottom (75). A verdict prices the farm; it never predicts whether
+   or when a token is issued. Shown as a chip in the board and in the detail
+   view, with the stake and the rule stated.
+
+### Walk-forward numbers (the program's own run, same snapshot)
+
+Selected config per fold (radar-2):
+
+| Held-out window | Train | Test | Mcap Spearman | Ratio Spearman | MdAPE |
+|---|---|---|---|---|---|
+| 2023-01-02 to 2024-02-09 | 26 | 27 | 0.257 | 0.124 | 82.9% |
+| 2024-02-18 to 2025-04-02 | 53 | 26 | 0.295 | 0.043 | 87.9% |
+| 2025-04-11 to 2026-08-26 | 79 | 27 | 0.153 | -0.230 | 87.8% |
+| **Mean** | | | **0.235** | **-0.021** | **86.2%** |
+
+Candidates (mean held-out):
+
+| Configuration | Mcap Spearman | Ratio Spearman | MdAPE |
+|---|---|---|---|
+| radar-2 (v1) | 0.235 | -0.021 | 86.2% |
+| category median only | 0.235 | -0.070 | 85.8% |
+| shrunk k=10 | 0.228 | 0.117 | 87.0% |
+| shrunk k=10, no growth | 0.243 | 0.182 | 86.4% |
+| TVL x global median | 0.231 | n/a (constant prediction cannot rank) | 86.6% |
+
+### The honest finding — stated plainly
+
+**No validation number improves.** The best challenger (shrunk k=10, no
+growth, 0.243) beats radar-2 (0.235) by 0.008 — inside the 0.05 margin and
+inside the noise at n≈26 per fold — so the board keeps the radar-2
+configuration and the ranking is unchanged: top 5 identical to v1
+(steakhouse-financial $468,544,204; gauntlet $279,053,563; veda $265,197,406;
+usdd $161,649,883; upshift $94,240,557), global multiple 0.1689x, 11
+calibrated categories. The ratio test is the sharper result: mean ratio
+Spearman is ≈0.0 for every candidate — the market-cap-to-TVL ratio is not
+predictable from these figures (log-ratio SD 2.28; 15 of 144 live protocols
+have mcap exactly 0), and the ranking is carried by TVL scale: even TVL
+times one global median ranks held-out market caps at 0.231. The revision
+does not claim a tuned-model win. What it adds, measurably, is the test
+itself (v1 had none — the named gap), the rank ranges, and the verdicts.
+
+Bootstrap rank ranges (200 refits): median p90–p10 width 59 ranks of 226
+(p25 25, p75 107); only 3 rows hold a range of 5 or less. Top 10 ranges:
+#1 steakhouse 1–1, #2 gauntlet 2–3, #3 veda 3–21, #4 usdd 3–5, #5 upshift
+5–49, #6 bittensor-dtao 2–26, #7 onre 5–11, #8 opentrade 6–14, #9
+plume-vaults 7–18, #10 nonce-capital 6–12. Only the top two ranks are firm.
+
+Two changes the exploration tested and rejected, on the validation numbers:
+excluding the 16 zero-mcap protocols from calibration (held-out mcap Spearman
+0.237 vs 0.255 with them in — no improvement) and dropping the growth factor
+(+0.008, noise). Both stay as v1 had them; the dashboard says so in the
+candidate table instead of hiding it.
+
+One real bug the work caught: the ratio test first used the rounded implied
+value divided by TVL, which made a constant prediction (TVL x global median)
+look like it ranked ratios at 0.289 — a rounding artifact. The ratio test now
+uses the unrounded factor product; TVL-only correctly scores n/a.
+
+### Verification (round 2)
+
+- Two runs, same snapshot, two output dirs (`/tmp/radar-v2-a`,
+  `/tmp/radar-v2-b`): `diff -r` identical, every file byte-identical.
+- In-page recompute check in the real browser: 0 mismatches of 226 rows.
+- Dashboard source 35,420 B total, dossier text 35,603 B — under the
+  65,536 B cap. Dossier 748,454 B ≤ 1.5 MiB.
+- Screenshots re-taken in the real browser (headless Chromium 159.0.8154.6,
+  `--screenshot`, 1440x900 JPEG each): 1-board.jpg 180,589 B (validation
+  panel + first board row visible); 2-detail.jpg 179,317 B
+  (`#p=steakhouse-financial`, rank range 1–1, FARM · $150 staked);
+  3-filtered.jpg 173,617 B (`#cat=Lending`, 14 of 226 rows).
+- Kit check (new CLI, `--worktree`, no transcripts yet): 4 passed
+  (competition_open, snapshot, license_osi, entrypoint), 1 failed
+  (transcripts_present — no bundle yet), 14 skipped (transcript gates),
+  5 at-submission (repo_public, repo_owner, repo_created_after_open,
+  commit_in_repo, duplicate_snapshot — resolve at push/submit).
+- Bundle NOT written in this session: the run record is not whole (the
+  earliest discovered session opens with a summary, so the person's opening
+  prompt is missing) and 0 usage rows attached (this subagent's rows are
+  written only once its run completes). The parent re-bundles from the main
+  chat: `--session` this session
+  (`~/agents/agent-1ffea42a-7bf1-4542-8a2a-1df72e3dc2b3/sessions/1ffea42a-7bf1-4542-8a2a-1df72e3dc2b3.jsonl`)
+  and the v1 build session (`d3ff6411-0795-48d0-a4ba-ba6e2ede70e9`) with
+  `--no-discover`, plus `--muse-usage` rows from the kit's SELECT (agent_ids
+  from the first line of each bundled session file), plus `--prompt-file`
+  with the person's verbatim opening words. Do NOT bundle the two
+  pre-opening sessions the discovery run found (`2c013bf3…`,
+  `ea3a1089…`, first records before 2026-11-14T10:00:00Z) — they would fail
+  thinking_in_window.
+
+## Run it
+
+```sh
+mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts --input <snapshot.json>
+```

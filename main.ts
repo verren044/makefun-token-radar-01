@@ -66,16 +66,16 @@ function main(): void {
   const out = flag('output', process.env.MAKEFUN_OUTPUT_DIR ?? '/output');
 
   const snap = parseSnap(readFileSync(inputFile, 'utf8'));
-  const { board, earlySize, cal } = buildBoard(snap);
+  const { board, earlySize, cal, validation } = buildBoard(snap);
   const problem = boardProblem(board, snap);
   if (problem !== null) fail(`the model wrote a board the gate refuses: ${problem}`);
   const cut = truncatedSteps(board);
   if (cut.length > 0) fail(`${cut.length} farm steps were cut short: ${cut[0]}`);
 
-  const payload = buildPayload(snap, board, earlySize, cal);
+  const payload = buildPayload(snap, board, earlySize, cal, validation);
 
   mkdirSync(out, { recursive: true });
-  writeFileSync(join(out, 'board.json'), `${JSON.stringify({ rows: board })}\n`);
+  writeFileSync(join(out, 'board.json'), `${JSON.stringify({ rows: board, validation })}\n`);
   writeFileSync(join(out, 'data.js'), payloadScript(payload));
 
   const dashFiles = copyDir(join(root, 'dashboard'), join(out, 'dashboard'));
@@ -94,9 +94,18 @@ function main(): void {
 
   const top = board[0]!;
   const bottom = board[board.length - 1]!;
+  const candLines = validation.candidates
+    .map((c) => `    ${c.name}: mean held-out mcap Spearman ${c.mean_mcap_spearman.toFixed(3)}, ratio Spearman ${c.mean_ratio_spearman === null ? 'n/a' : c.mean_ratio_spearman.toFixed(3)}, MdAPE ${c.mean_mdape === null ? 'n/a' : c.mean_mdape.toFixed(1) + '%'}`)
+    .join('\n');
+  const foldLines = validation.candidates[0]!.folds
+    .map((f) => `    ${f.window}: train ${f.train_n}, test ${f.test_n}, mcap Spearman ${f.mcap_spearman.toFixed(3)}, ratio Spearman ${f.ratio_spearman === null ? 'n/a' : f.ratio_spearman.toFixed(3)}, MdAPE ${f.mdape === null ? 'n/a' : f.mdape.toFixed(1) + '%'}`)
+    .join('\n');
   process.stdout.write(
     `token radar: ${snap.protocols.length} protocols, ${snap.watchlist.length} on the watchlist, ${board.length} rows scored (${earlySize} early, ${payload.live_size} live set aside)\n` +
       `token radar: global multiple ${cal.global.toFixed(4)}x, ${cal.stats.length} calibrated categories, top ${top.slug} $${top.implied_value_usd}, bottom ${bottom.slug} $${bottom.implied_value_usd}\n` +
+      `token radar: walk-forward validation, selected ${validation.selected}\n${candLines}\n` +
+      `token radar: selected config per-fold\n${foldLines}\n` +
+      `token radar: bootstrap rank ranges (200 refits): median width ${validation.rank_ranges.median_width}, p25 ${validation.rank_ranges.p25_width}, p75 ${validation.rank_ranges.p75_width}, tight rows ${validation.rank_ranges.tight_rows}\n` +
       `token radar: wrote ${join(out, 'board.json')}, ${join(out, 'data.js')}, ${join(out, 'dashboard')} (${dashFiles.length} files), ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n`,
   );
 }
