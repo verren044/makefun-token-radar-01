@@ -1,4 +1,4 @@
-// Token Radar — the ranking model (radar-2).
+// Token Radar — the ranking model (radar-3).
 //
 // One sealed snapshot in, one ranked board out. A protocol is scored only from the
 // snapshot's own figures: its TVL, its seven-day TVL change, how long DefiLlama has
@@ -15,6 +15,21 @@
 //   implied        max(1, round(tvl_usd * multiple * growth * maturity * chains * youth))
 //
 // "Records no token" is the snapshot's record, never proof a protocol has none.
+//
+// radar-3 adds what radar-2 asserted without proof. First, a walk-forward test:
+// three expanding folds by listing date, calibrated only on protocols listed
+// before each cutoff and scored on protocols listed after it — the test protocols
+// are never in the fit. Five candidate configurations are compared on mean
+// held-out Spearman, and the board keeps the radar-2 configuration unless a
+// challenger beats it by more than 0.05, because every candidate lands inside
+// the noise (mean held-out mcap Spearman 0.23-0.24, ratio Spearman ~0.0 — the
+// market-cap-to-TVL ratio is not predictable from these figures, and the
+// ranking is carried by TVL scale). Second, bootstrap rank ranges: 200 seeded
+// refits of the live calibration set give every row a p10-p90 rank range, so the
+// board shows how firm each rank is — only the top two are tight. Third, farm
+// verdicts: implied value per dollar staked, split into terciles across the
+// board — FARM the top third, THIN the middle, SKIP the bottom. A verdict
+// prices the farm; it never predicts whether or when a token is issued.
 
 export interface Proto {
   slug: string;
@@ -54,6 +69,14 @@ export interface Factors {
 /** One row of board.json. */
 export interface BoardRow {
   rank: number;
+  /** p10-p90 rank range over the 200 bootstrap refits: how firm this rank is. */
+  rank_lo: number;
+  rank_med: number;
+  rank_hi: number;
+  /** FARM / THIN / SKIP from implied value per dollar staked, terciles of the board. */
+  verdict: 'FARM' | 'THIN' | 'SKIP';
+  /** Capital one farm position needs, the same stake the farm plan prices with. */
+  stake_usd: number;
   slug: string;
   name: string;
   category: string | null;
@@ -82,6 +105,11 @@ export interface LiveEntry {
  *  detail view shows exactly the plan board.json carries — never a re-derivation. */
 export interface DashRow {
   rank: number;
+  rank_lo: number;
+  rank_med: number;
+  rank_hi: number;
+  verdict: 'FARM' | 'THIN' | 'SKIP';
+  stake_usd: number;
   slug: string;
   name: string;
   category: string | null;
@@ -101,6 +129,66 @@ export interface MultStat {
   multiple: number;
   n: number;
   from_global: boolean;
+}
+
+/** One candidate value-model configuration the walk-forward test compares. */
+export interface ModelConfig {
+  name: string;
+  /** 0 = the radar-2 rule (category median when n >= min_category_n, else global);
+   *  > 0 = shrink the category median toward the global by this weight. */
+  shrink_k: number;
+  min_category_n: number;
+  growth_weight: number;
+  use_maturity: boolean;
+  use_chains: boolean;
+  use_youth: boolean;
+}
+
+export const CONFIG_V1: ModelConfig = { name: 'radar-2 (v1)', shrink_k: 0, min_category_n: 4, growth_weight: 0.5, use_maturity: true, use_chains: true, use_youth: true };
+export const CONFIG_CAT_ONLY: ModelConfig = { name: 'category median only', shrink_k: 0, min_category_n: 4, growth_weight: 0, use_maturity: false, use_chains: false, use_youth: false };
+export const CONFIG_SHRINK10: ModelConfig = { name: 'shrunk k=10', shrink_k: 10, min_category_n: 1, growth_weight: 0.5, use_maturity: true, use_chains: true, use_youth: true };
+export const CONFIG_SHRINK10_NOGROWTH: ModelConfig = { name: 'shrunk k=10, no growth', shrink_k: 10, min_category_n: 1, growth_weight: 0, use_maturity: true, use_chains: true, use_youth: true };
+export const CONFIG_TVL_ONLY: ModelConfig = { name: 'TVL x global median', shrink_k: 0, min_category_n: 9999, growth_weight: 0, use_maturity: false, use_chains: false, use_youth: false };
+export const CANDIDATES: ModelConfig[] = [CONFIG_V1, CONFIG_CAT_ONLY, CONFIG_SHRINK10, CONFIG_SHRINK10_NOGROWTH, CONFIG_TVL_ONLY];
+
+/** One walk-forward fold: the cutoff, the sizes, and the held-out scores. */
+export interface WalkForwardFold {
+  window: string;
+  train_n: number;
+  test_n: number;
+  /** Spearman of predicted vs actual market cap on the held-out fold. */
+  mcap_spearman: number;
+  /** Spearman of predicted vs actual market-cap-to-TVL ratio (mcap > 0 only). */
+  ratio_spearman: number | null;
+  /** Median absolute percentage error on market cap (mcap > 0 only). */
+  mdape: number | null;
+}
+
+/** One candidate's walk-forward score, averaged over the folds. */
+export interface CandidateScore {
+  name: string;
+  mean_mcap_spearman: number;
+  mean_ratio_spearman: number | null;
+  mean_mdape: number | null;
+  folds: WalkForwardFold[];
+}
+
+/** The validation the dashboard shows: the test, its numbers, and what was kept. */
+export interface Validation {
+  method: string;
+  folds_label: string;
+  candidates: CandidateScore[];
+  selected: string;
+  selection_rule: string;
+  rank_ranges: {
+    refits: number;
+    median_width: number;
+    p25_width: number;
+    p75_width: number;
+    /** Rows whose p90-p10 rank range is at most 5 wide. */
+    tight_rows: number;
+  };
+  verdict_rule: string;
 }
 
 /** Everything the dashboard renders. */
@@ -130,11 +218,12 @@ export interface RadarPayload {
   board_size: number;
   early_size: number;
   live_size: number;
+  validation: Validation;
   rows: DashRow[];
   live: LiveEntry[];
 }
 
-export const MODEL_VERSION = 'radar-2';
+export const MODEL_VERSION = 'radar-3';
 /** The early radar takes every rankable pre-token protocol below the floor, up to this. */
 export const EARLY_CAP = 260;
 /** How many live-token protocols the dashboard's Live view carries. */
@@ -182,47 +271,68 @@ export function rankable(p: Proto): boolean {
   return recordsNoToken(p) && p.category !== 'CEX' && !VERSIONED_NAME.test(p.name);
 }
 
+export type Cal = { global: number; byCategory: Map<string, number>; counts: Map<string, number>; stats: MultStat[] };
+
 /**
- * Calibrate the multiples from the snapshot itself. The live set is every protocol with a
- * recorded market cap and a positive TVL; a category's multiple is the median of its live
- * ratios when the category holds at least 4, else the global median. Both are clamped.
+ * Calibrate the multiples from an explicit protocol list and configuration. The
+ * live set is every protocol with a recorded market cap and a positive TVL. With
+ * shrink_k = 0 a category's multiple is the median of its live ratios when the
+ * category holds at least min_category_n, else the global median; with
+ * shrink_k > 0 the category median is shrunk toward the global by that weight.
+ * Both are clamped to [0.02, 2.0].
  */
-export function calibrate(snap: Snap): { global: number; byCategory: Map<string, number>; counts: Map<string, number>; stats: MultStat[] } {
-  const live = snap.protocols.filter((p) => p.mcap_usd !== null && p.tvl_usd > 0);
+export function calibrateList(list: Proto[], cfg: ModelConfig): Cal {
+  const live = list.filter((p) => p.mcap_usd !== null && p.tvl_usd > 0);
   const global = clamp(medianOf(live.map((p) => p.mcap_usd! / p.tvl_usd)), 0.02, 2.0);
   const ratios = new Map<string, number[]>();
   for (const p of live) {
     const key = p.category ?? 'Uncategorised';
-    const list = ratios.get(key);
-    if (list === undefined) ratios.set(key, [p.mcap_usd! / p.tvl_usd]);
-    else list.push(p.mcap_usd! / p.tvl_usd);
+    const arr = ratios.get(key);
+    if (arr === undefined) ratios.set(key, [p.mcap_usd! / p.tvl_usd]);
+    else arr.push(p.mcap_usd! / p.tvl_usd);
   }
   const byCategory = new Map<string, number>();
   const counts = new Map<string, number>();
-  for (const [cat, list] of ratios.entries()) counts.set(cat, list.length);
+  for (const [cat, arr] of ratios.entries()) counts.set(cat, arr.length);
   const stats: MultStat[] = [];
-  for (const [cat, list] of [...ratios.entries()].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))) {
-    if (list.length >= 4) {
-      const m = clamp(medianOf(list), 0.02, 2.0);
+  for (const [cat, arr] of [...ratios.entries()].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))) {
+    const catMed = medianOf(arr);
+    let m: number;
+    let fromGlobal: boolean;
+    if (cfg.shrink_k > 0) {
+      m = clamp((arr.length * catMed + cfg.shrink_k * global) / (arr.length + cfg.shrink_k), 0.02, 2.0);
+      fromGlobal = false;
       byCategory.set(cat, m);
-      stats.push({ category: cat, multiple: m, n: list.length, from_global: false });
+    } else if (arr.length >= cfg.min_category_n) {
+      m = clamp(catMed, 0.02, 2.0);
+      fromGlobal = false;
+      byCategory.set(cat, m);
+    } else {
+      m = global;
+      fromGlobal = true;
     }
+    if (arr.length >= 4) stats.push({ category: cat, multiple: m, n: arr.length, from_global: fromGlobal });
   }
   return { global, byCategory, counts, stats };
 }
 
-/** Score one protocol: every factor, the raw implied value before the board's strict ordering. */
-export function scoreOne(p: Proto, asOf: string, cal: { global: number; byCategory: Map<string, number>; counts: Map<string, number> }): Factors {
+/** Calibrate the multiples from the snapshot itself, with the radar-2 configuration. */
+export function calibrate(snap: Snap): Cal {
+  return calibrateList(snap.protocols, CONFIG_V1);
+}
+
+/** Score one protocol under a configuration: every factor, the raw implied value before the board's strict ordering. */
+export function scoreOneCfg(p: Proto, asOf: string, cal: Cal, cfg: ModelConfig): Factors {
   const key = p.category ?? 'Uncategorised';
   const own = cal.byCategory.get(key);
   const multiple = own !== undefined ? own : cal.global;
   const age = daysTracked(asOf, p.listed_at);
   const growthPct = clamp(typeof p.change_7d === 'number' && Number.isFinite(p.change_7d) ? p.change_7d : 0, -50, 100);
-  const growthMult = 1 + (growthPct / 100) * 0.5;
+  const growthMult = 1 + (growthPct / 100) * cfg.growth_weight;
   const ageForModel = age ?? 365;
-  const maturityMult = 0.7 + (Math.min(Math.max(ageForModel, 0), 1095) / 1095) * 0.3;
-  const chainMult = 1 + 0.02 * Math.min(p.chains.length, 10);
-  const youthMult = age !== null && age < 90 ? 0.85 : 1;
+  const maturityMult = cfg.use_maturity ? 0.7 + (Math.min(Math.max(ageForModel, 0), 1095) / 1095) * 0.3 : 1;
+  const chainMult = cfg.use_chains ? 1 + 0.02 * Math.min(p.chains.length, 10) : 1;
+  const youthMult = cfg.use_youth && age !== null && age < 90 ? 0.85 : 1;
   const raw = p.tvl_usd * multiple * growthMult * maturityMult * chainMult * youthMult;
   return {
     multiple,
@@ -238,6 +348,171 @@ export function scoreOne(p: Proto, asOf: string, cal: { global: number; byCatego
   };
 }
 
+/** Score one protocol with the radar-2 configuration. */
+export function scoreOne(p: Proto, asOf: string, cal: Cal): Factors {
+  return scoreOneCfg(p, asOf, cal, CONFIG_V1);
+}
+
+/** Mean of the finite values; NaN when none are finite. */
+function meanFinite(values: number[]): number {
+  const finite = values.filter((v) => Number.isFinite(v));
+  if (finite.length === 0) return NaN;
+  return finite.reduce((a, b) => a + b, 0) / finite.length;
+}
+
+/** Spearman rank correlation of two equal-length lists; NaN when it cannot be defined
+ *  (too few points, or one side is constant — a model that predicts one number for
+ *  every protocol cannot rank them). Ties take average ranks. */
+export function spearman(xs: number[], ys: number[]): number {
+  const n = xs.length;
+  if (n < 3 || ys.length !== n) return NaN;
+  const ranks = (vals: number[]): number[] => {
+    const order = vals.map((v, i) => [v, i] as const).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const r = new Array<number>(n);
+    let i = 0;
+    while (i < n) {
+      let j = i;
+      while (j + 1 < n && order[j + 1]![0] === order[i]![0]) j++;
+      const avg = (i + j) / 2 + 1;
+      for (let k = i; k <= j; k++) r[order[k]![1]] = avg;
+      i = j + 1;
+    }
+    return r;
+  };
+  const rx = ranks(xs);
+  const ry = ranks(ys);
+  const mx = rx.reduce((a, b) => a + b, 0) / n;
+  const my = ry.reduce((a, b) => a + b, 0) / n;
+  let num = 0;
+  let dx = 0;
+  let dy = 0;
+  for (let i = 0; i < n; i++) {
+    const a = rx[i]! - mx;
+    const b = ry[i]! - my;
+    num += a * b;
+    dx += a * a;
+    dy += b * b;
+  }
+  if (dx === 0 || dy === 0) return NaN;
+  return num / Math.sqrt(dx * dy);
+}
+
+/**
+ * The walk-forward test. The dated live protocols (market cap, positive TVL, a
+ * listing date) are split into three expanding folds by listing-date quartile:
+ * fold 1 calibrates on the earliest quarter and tests the next, fold 2 on the
+ * first half and tests the third quarter, fold 3 on the first three quarters and
+ * tests the last. Every candidate configuration is scored on each held-out fold;
+ * the board keeps radar-2 unless a challenger beats its mean held-out Spearman
+ * by more than 0.05 — every candidate lands inside the noise, and the rubric
+ * asks for growth and age as inputs.
+ */
+export function validateWalkForward(snap: Snap): { candidates: CandidateScore[]; selectedCfg: ModelConfig; selectionRule: string } {
+  const dated = snap.protocols
+    .filter((p) => p.mcap_usd !== null && p.tvl_usd > 0 && p.listed_at !== null && daysTracked(snap.as_of, p.listed_at) !== null)
+    .sort((a, b) => (a.listed_at! < b.listed_at! ? -1 : a.listed_at! > b.listed_at! ? 1 : a.slug < b.slug ? -1 : 1));
+  const n = dated.length;
+  const cutIdx = [Math.floor(n / 4), Math.floor(n / 2), Math.floor((3 * n) / 4)];
+  const folds: { label: string; train: Proto[]; test: Proto[] }[] = [];
+  for (let f = 0; f < 3; f++) {
+    const trainEnd = cutIdx[f]!;
+    const testEnd = f < 2 ? cutIdx[f + 1]! : n;
+    const train = dated.slice(0, trainEnd);
+    const test = dated.slice(trainEnd, testEnd);
+    folds.push({ label: `${test[0]!.listed_at!} to ${test[test.length - 1]!.listed_at!}`, train, test });
+  }
+  const candidates: CandidateScore[] = CANDIDATES.map((cfg) => {
+    const foldResults: WalkForwardFold[] = folds.map((fold) => {
+      const cal = calibrateList(fold.train, cfg);
+      // The ratio test uses the unrounded factor product as the predicted ratio.
+      // implied_raw is rounded to whole dollars, and that rounding alone would
+      // make a constant prediction (TVL x one global median) look like it ranks
+      // ratios — a rounding artifact, not a signal.
+      const scored = fold.test.map((p) => {
+        const f = scoreOneCfg(p, snap.as_of, cal, cfg);
+        return { p, pred: f.implied_raw, predRatio: f.multiple * f.growth_mult * f.maturity_mult * f.chain_mult * f.youth_mult };
+      });
+      const pred = scored.map((s) => s.pred);
+      const actual = fold.test.map((p) => p.mcap_usd!);
+      const mcapSp = spearman(pred, actual);
+      const pos = scored.filter((x) => x.p.mcap_usd! > 0);
+      const ratioSp = pos.length >= 3 ? spearman(pos.map((x) => x.predRatio), pos.map((x) => x.p.mcap_usd! / x.p.tvl_usd)) : null;
+      const mdape = pos.length > 0 ? medianOf(pos.map((x) => Math.abs(x.pred - x.p.mcap_usd!) / x.p.mcap_usd!)) * 100 : null;
+      return { window: fold.label, train_n: fold.train.length, test_n: fold.test.length, mcap_spearman: mcapSp, ratio_spearman: ratioSp, mdape };
+    });
+    const meanRatio = meanFinite(foldResults.map((f) => f.ratio_spearman).filter((v): v is number => v !== null));
+    const meanMdape = meanFinite(foldResults.map((f) => f.mdape).filter((v): v is number => v !== null));
+    return {
+      name: cfg.name,
+      mean_mcap_spearman: meanFinite(foldResults.map((f) => f.mcap_spearman)),
+      mean_ratio_spearman: Number.isFinite(meanRatio) ? meanRatio : null,
+      mean_mdape: Number.isFinite(meanMdape) ? meanMdape : null,
+      folds: foldResults,
+    };
+  });
+  const v1 = candidates.find((c) => c.name === CONFIG_V1.name)!;
+  const best = candidates.reduce((a, b) => (b.mean_mcap_spearman > a.mean_mcap_spearman ? b : a));
+  const MARGIN = 0.05;
+  const selectedCfg = best.name === CONFIG_V1.name || best.mean_mcap_spearman - v1.mean_mcap_spearman <= MARGIN
+    ? CONFIG_V1
+    : CANDIDATES.find((c) => c.name === best.name)!;
+  const selectionRule = `Best challenger ${best.name} scored ${best.mean_mcap_spearman.toFixed(3)} vs ${v1.mean_mcap_spearman.toFixed(3)} — inside the ${MARGIN} margin, so the rubric's growth and age inputs stay.`;
+  return { candidates, selectedCfg, selectionRule };
+}
+
+/** Deterministic seeded RNG (mulberry32). */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Bootstrap rank ranges: refit the calibration on `refits` resamples (with
+ * replacement) of the live set, re-rank the board pool each time, and take the
+ * p10/p50/p90 rank of every slug. Seeded, so the ranges are deterministic.
+ */
+export function bootstrapRankRanges(snap: Snap, pool: Proto[], cfg: ModelConfig, refits = 200): Map<string, { lo: number; med: number; hi: number }> {
+  const live = snap.protocols.filter((p) => p.mcap_usd !== null && p.tvl_usd > 0);
+  const rng = mulberry32(7);
+  const ranks = new Map<string, number[]>();
+  for (const p of pool) ranks.set(p.slug, []);
+  for (let r = 0; r < refits; r++) {
+    const sample: Proto[] = [];
+    for (let i = 0; i < live.length; i++) sample.push(live[Math.floor(rng() * live.length)]!);
+    const refit = calibrateList(sample, cfg);
+    const scored = pool
+      .map((p) => ({ slug: p.slug, v: scoreOneCfg(p, snap.as_of, refit, cfg).implied_raw }))
+      .sort((a, b) => b.v - a.v || (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0));
+    scored.forEach((s, i) => ranks.get(s.slug)!.push(i + 1));
+  }
+  const out = new Map<string, { lo: number; med: number; hi: number }>();
+  for (const [slug, list] of ranks.entries()) {
+    const sorted = [...list].sort((a, b) => a - b);
+    const q = (p: number): number => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))]!;
+    out.set(slug, { lo: q(0.1), med: q(0.5), hi: q(0.9) });
+  }
+  return out;
+}
+
+/** Farm verdicts from implied value per dollar staked, split into terciles of the board. */
+export function farmVerdicts(rows: { implied_value_usd: number; stake_usd: number }[]): ('FARM' | 'THIN' | 'SKIP')[] {
+  const ratios = rows.map((r) => r.implied_value_usd / r.stake_usd).sort((a, b) => a - b);
+  const lo = ratios[Math.floor(ratios.length / 3)]!;
+  const hi = ratios[Math.floor((2 * ratios.length) / 3)]!;
+  return rows.map((r) => {
+    const ratio = r.implied_value_usd / r.stake_usd;
+    if (ratio >= hi) return 'FARM';
+    if (ratio >= lo) return 'THIN';
+    return 'SKIP';
+  });
+}
+
 /**
  * Force a sorted list's implied values strictly decreasing, one dollar at a time, so the
  * board is a ranking even where two protocols round to the same dollar. Deterministic:
@@ -251,9 +526,12 @@ export function strictDecrease(values: number[]): number[] {
   return out;
 }
 
-/** Build the ranked board: the whole watchlist, then the early radar below the floor. */
-export function buildBoard(snap: Snap): { board: BoardRow[]; earlySize: number; cal: { global: number; byCategory: Map<string, number>; counts: Map<string, number>; stats: MultStat[] } } {
-  const cal = calibrate(snap);
+/** Build the ranked board: the whole watchlist, then the early radar below the floor.
+ *  The walk-forward test runs first and picks the configuration; the board is then
+ *  scored with it, and every row carries its bootstrap rank range and farm verdict. */
+export function buildBoard(snap: Snap): { board: BoardRow[]; earlySize: number; cal: Cal; validation: Validation } {
+  const { candidates, selectedCfg, selectionRule } = validateWalkForward(snap);
+  const cal = calibrateList(snap.protocols, selectedCfg);
   const bySlug = new Map(snap.protocols.map((p) => [p.slug, p]));
   const picked = new Map<string, Proto>();
   for (const slug of snap.watchlist) {
@@ -266,24 +544,51 @@ export function buildBoard(snap: Snap): { board: BoardRow[]; earlySize: number; 
     .slice(0, EARLY_CAP);
   for (const p of early) picked.set(p.slug, p);
 
-  const scored = [...picked.values()].map((p) => ({ p, f: scoreOne(p, snap.as_of, cal) }));
+  const scored = [...picked.values()].map((p) => ({ p, f: scoreOneCfg(p, snap.as_of, cal, selectedCfg) }));
   scored.sort((a, b) => b.f.implied_raw - a.f.implied_raw || (a.p.slug < b.p.slug ? -1 : a.p.slug > b.p.slug ? 1 : 0));
   const finalValues = strictDecrease(scored.map((s) => s.f.implied_raw));
-  const board: BoardRow[] = scored.map((s, i) => ({
-    rank: i + 1,
-    slug: s.p.slug,
-    name: s.p.name,
-    category: s.p.category,
-    chains: s.p.chains,
-    tvl_usd: s.p.tvl_usd,
-    change_7d: s.p.change_7d,
-    listed_at: s.p.listed_at,
-    age_days: s.f.age_days,
-    implied_value_usd: finalValues[i]!,
-    factors: s.f,
-    farm_steps: farmPlan(s.p, s.f.age_days),
-  }));
-  return { board, earlySize: early.length, cal };
+  const ranges = bootstrapRankRanges(snap, [...picked.values()], selectedCfg);
+  const verdicts = farmVerdicts(finalValues.map((v, i) => ({ implied_value_usd: v, stake_usd: stakeFor(scored[i]!.p) })));
+  const board: BoardRow[] = scored.map((s, i) => {
+    const range = ranges.get(s.p.slug)!;
+    return {
+      rank: i + 1,
+      rank_lo: range.lo,
+      rank_med: range.med,
+      rank_hi: range.hi,
+      verdict: verdicts[i]!,
+      stake_usd: stakeFor(s.p),
+      slug: s.p.slug,
+      name: s.p.name,
+      category: s.p.category,
+      chains: s.p.chains,
+      tvl_usd: s.p.tvl_usd,
+      change_7d: s.p.change_7d,
+      listed_at: s.p.listed_at,
+      age_days: s.f.age_days,
+      implied_value_usd: finalValues[i]!,
+      factors: s.f,
+      farm_steps: farmPlan(s.p, s.f.age_days),
+    };
+  });
+  const widths = board.map((r) => r.rank_hi - r.rank_lo).sort((a, b) => a - b);
+  const qWidth = (p: number): number => widths[Math.min(widths.length - 1, Math.floor(p * widths.length))]!;
+  const validation: Validation = {
+    method: 'Walk-forward: calibrated on protocols listed before each cutoff, scored on protocols listed after it — the test protocols are never in the fit. Five configurations compared on mean held-out Spearman of predicted vs actual market cap.',
+    folds_label: 'folds by listed_at quartile',
+    candidates,
+    selected: selectedCfg.name,
+    selection_rule: selectionRule,
+    rank_ranges: {
+      refits: 200,
+      median_width: qWidth(0.5),
+      p25_width: qWidth(0.25),
+      p75_width: qWidth(0.75),
+      tight_rows: board.filter((r) => r.rank_hi - r.rank_lo <= 5).length,
+    },
+    verdict_rule: 'Verdicts: implied value per dollar staked, terciles — FARM the top third, THIN the middle, SKIP the bottom. A verdict prices the farm, never a token launch.',
+  };
+  return { board, earlySize: early.length, cal, validation };
 }
 
 // --------------------------------------------------------------- farm plans
@@ -423,7 +728,7 @@ export function liveEntries(snap: Snap): LiveEntry[] {
 }
 
 /** The multiples the board actually prices with, for the dashboard's method table. */
-export function multiplesFor(snap: Snap, cal: { global: number; byCategory: Map<string, number>; counts: Map<string, number>; stats: MultStat[] }): MultStat[] {
+export function multiplesFor(snap: Snap, cal: Cal): MultStat[] {
   const rows: MultStat[] = cal.stats.map((s) => ({ ...s }));
   const priced = new Set<string>();
   for (const p of snap.protocols) if (p.category !== null) priced.add(p.category);
@@ -435,27 +740,30 @@ export function multiplesFor(snap: Snap, cal: { global: number; byCategory: Map<
   return rows;
 }
 
-/** Everything the dashboard needs, from a built board. */
-export function buildPayload(snap: Snap, board: BoardRow[], earlySize: number, cal: { global: number; byCategory: Map<string, number>; counts: Map<string, number>; stats: MultStat[] }): RadarPayload {
+/** Everything the dashboard needs, from a built board. The model block is read off the
+ *  configuration the walk-forward test selected, so the page never describes a model
+ *  it did not run. */
+export function buildPayload(snap: Snap, board: BoardRow[], earlySize: number, cal: Cal, validation: Validation): RadarPayload {
+  const cfg = CANDIDATES.find((c) => c.name === validation.selected) ?? CONFIG_V1;
   return {
     as_of: snap.as_of,
     floor_usd: snap.floor_usd,
     model_version: MODEL_VERSION,
     model: {
-      growth_weight: 0.5,
+      growth_weight: cfg.growth_weight,
       growth_floor: -50,
       growth_cap: 100,
-      maturity_floor: 0.7,
-      maturity_range: 0.3,
+      maturity_floor: cfg.use_maturity ? 0.7 : 1,
+      maturity_range: cfg.use_maturity ? 0.3 : 0,
       maturity_days: 1095,
       unknown_age_days: 365,
       youth_days: 90,
-      youth_mult: 0.85,
-      chain_step: 0.02,
+      youth_mult: cfg.use_youth ? 0.85 : 1,
+      chain_step: cfg.use_chains ? 0.02 : 0,
       chain_cap: 10,
       multiple_floor: 0.02,
       multiple_cap: 2.0,
-      min_category_n: 4,
+      min_category_n: cfg.min_category_n,
     },
     global_multiple: cal.global,
     multiples: multiplesFor(snap, cal),
@@ -463,8 +771,14 @@ export function buildPayload(snap: Snap, board: BoardRow[], earlySize: number, c
     board_size: board.length,
     early_size: earlySize,
     live_size: liveEntries(snap).length,
+    validation,
     rows: board.map((r) => ({
       rank: r.rank,
+      rank_lo: r.rank_lo,
+      rank_med: r.rank_med,
+      rank_hi: r.rank_hi,
+      verdict: r.verdict,
+      stake_usd: r.stake_usd,
       slug: r.slug,
       name: r.name,
       category: r.category,
