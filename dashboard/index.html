@@ -1,98 +1,159 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Token Radar — pre-token protocols ranked by implied value</title>
+<title>Token Radar — model radar-4</title>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<div class="page">
-  <header class="masthead">
-    <div class="masthead-inner">
-      <div class="brand"><span class="brand-dot" aria-hidden="true"></span><span class="brand-word">Token&nbsp;Radar</span></div>
-      <p class="masthead-note" id="snapshot-note">Snapshot loading…</p>
+<header class="masthead">
+  <div class="wrap masthead-inner">
+    <div class="brand"><span class="brand-dot" aria-hidden="true"></span>Token Radar</div>
+    <div class="masthead-note">Snapshot 2026-11-14 · DefiLlama protocol index · model radar-4</div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="kicker">Token launch radar · model radar-4</p>
+      <h1>40 watchlist protocols, ranked by implied value</h1>
+      <p class="lede">The watchlist is the floor: every protocol with at least $50M of TVL and no token on record, plus 186 early rows below that floor. Implied value is a model, not a promise.</p>
     </div>
-  </header>
+    <div class="kpi-grid" id="kpi-grid" aria-label="Key figures"></div>
+  </section>
 
-  <main class="wrap" id="app" aria-busy="true">
-    <section class="hero">
-      <div>
-        <p class="kicker">Token launch radar · model radar-3</p>
-        <h1 id="hero-title">Which pre-token protocol is worth farming next?</h1>
-        <p class="lede" id="hero-lede">Ranking every protocol that records no token yet by what its launch would be worth, priced from the market's own multiples.</p>
-      </div>
-      <dl class="stats" id="stats"></dl>
-    </section>
+  <section class="card" id="validation">
+    <h2>Model validation — tested, not asserted</h2>
+    <p id="validation-method"></p>
+    <table class="data-table" id="fold-table">
+      <thead><tr><th>Held-out window</th><th class="num">Train</th><th class="num">Test</th><th class="num">Mcap Spearman</th><th class="num">Ratio Spearman</th><th class="num">MdAPE</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p id="kept-line"></p>
+    <p id="rank-ranges-line"></p>
+    <p id="verdict-rule-line"></p>
+    <p id="fitted-line"></p>
+  </section>
 
-    <section class="validation" id="validation" aria-labelledby="validation-title">
-      <h2 id="validation-title">Model validation — tested, not asserted</h2>
-      <p id="validation-method"></p>
-      <div class="mult-wrap"><table class="mult" id="fold-table">
-        <thead><tr><th scope="col">Held-out window</th><th scope="col" class="num">Train</th><th scope="col" class="num">Test</th><th scope="col" class="num">Mcap Spearman</th><th scope="col" class="num">Ratio Spearman</th><th scope="col" class="num">MdAPE</th></tr></thead>
-        <tbody></tbody>
-      </table></div>
-      <p class="sub" id="validation-selection"></p>
-      <p class="sub" id="validation-ranges"></p>
-      <p class="sub" id="validation-verdict"></p>
-    </section>
-
-    <section class="toolbar" aria-label="Board controls">
-      <label class="ctl">Search
-        <input type="search" id="q" placeholder="Name, category or chain" autocomplete="off">
+  <section class="card toolbar-card">
+    <div class="toolbar">
+      <label class="field">Search
+        <input id="search" type="search" placeholder="Name, category or chain" autocomplete="off">
       </label>
-      <label class="ctl">Category
-        <select id="cat" aria-label="Filter by category"></select>
+      <label class="field">Category
+        <select id="category-select"></select>
       </label>
-      <div class="ctl"><span class="ctl-label">Board</span>
-        <div class="seg" role="group" aria-label="Token status">
-          <button type="button" id="tab-pre" aria-pressed="true">Pre-token</button>
-          <button type="button" id="tab-live" aria-pressed="false">Live token</button>
+      <div class="field">Board
+        <div class="toggle" role="group" aria-label="Board">
+          <button id="toggle-pre" type="button" class="toggle-btn active" aria-pressed="true">Pre-token</button>
+          <button id="toggle-live" type="button" class="toggle-btn" aria-pressed="false">Live token</button>
         </div>
       </div>
-      <label class="ctl">Sort by
-        <select id="sort" aria-label="Sort the board">
+      <label class="field">Sort by
+        <select id="sort-select">
           <option value="implied">Implied value</option>
+          <option value="fitted">Fitted price</option>
           <option value="tvl">TVL</option>
           <option value="growth">7-day growth</option>
           <option value="age">Age</option>
           <option value="name">Name</option>
         </select>
       </label>
-      <p class="rowcount" id="rowcount"></p>
-    </section>
+      <p class="row-count" id="row-count" aria-live="polite"></p>
+    </div>
+    <div class="chips" id="chips" aria-label="Filter by category"></div>
+  </section>
 
-    <div class="chips" id="chips" aria-label="Quick category filters"></div>
+  <section class="card board-card">
+    <p class="caption" id="board-caption"></p>
+    <div class="table-scroll">
+      <table class="data-table board-table" id="board-table">
+        <thead>
+          <tr>
+            <th><button type="button" class="sort-head" data-sort="rank">Rank <span class="sort-arrow" data-arrow="rank"></span></button></th>
+            <th><button type="button" class="sort-head" data-sort="name">Protocol <span class="sort-arrow" data-arrow="name"></span></button></th>
+            <th class="num"><button type="button" class="sort-head" data-sort="tvl">TVL <span class="sort-arrow" data-arrow="tvl"></span></button></th>
+            <th class="num"><button type="button" class="sort-head" data-sort="growth">7d <span class="sort-arrow" data-arrow="growth"></span></button></th>
+            <th class="num"><button type="button" class="sort-head" data-sort="age">Age <span class="sort-arrow" data-arrow="age"></span></button></th>
+            <th class="num">Multiple</th>
+            <th class="num"><button type="button" class="sort-head" data-sort="implied">Implied value <span class="sort-arrow" data-arrow="implied"></span></button></th>
+            <th class="num"><button type="button" class="sort-head" data-sort="fitted">Fitted price <span class="sort-arrow" data-arrow="fitted"></span></button></th>
+            <th>Verdict</th>
+            <th>Token</th>
+          </tr>
+        </thead>
+        <tbody id="board-body"></tbody>
+      </table>
+      <table class="data-table board-table live-table" id="live-table" hidden>
+        <thead>
+          <tr>
+            <th>Rank</th><th>Protocol</th><th class="num">TVL</th><th class="num">7d</th>
+            <th class="num">Market cap</th><th class="num">Mcap/TVL</th><th>Token</th>
+          </tr>
+        </thead>
+        <tbody id="live-body"></tbody>
+      </table>
+    </div>
+  </section>
 
-    <section class="board" id="board" aria-live="polite"></section>
+  <section class="card" id="coverage">
+    <h2>Coverage — every protocol in the snapshot, accounted for</h2>
+    <p id="coverage-note"></p>
+    <table class="data-table">
+      <thead><tr><th>Bucket</th><th class="num">Protocols</th><th>What it is</th></tr></thead>
+      <tbody id="coverage-body"></tbody>
+    </table>
+  </section>
 
-    <section class="method" id="method" aria-labelledby="method-title">
-      <h2 id="method-title">How the implied value is priced</h2>
-      <p>One function scores every row, from the snapshot's own figures — never from a hand-kept list of names. A protocol's implied value is its TVL times the multiple the market already pays for its category, adjusted for growth, maturity, chain breadth and youth.</p>
-      <p class="formula" id="formula"></p>
-      <p id="method-notes"></p>
-      <h3>Category multiples, calibrated from this snapshot</h3>
-      <p class="sub">Each multiple is the median market-cap-to-TVL ratio of the live-token protocols in that category. A category with fewer than four live protocols is priced at the global median instead.</p>
-      <div class="mult-wrap"><table class="mult" id="mult-table">
-        <thead><tr><th scope="col">Category</th><th scope="col">Multiple</th><th scope="col">Live protocols</th><th scope="col">Source</th></tr></thead>
-        <tbody></tbody>
-      </table></div>
-      <p class="sub" id="recompute-note"></p>
-      <h3>Candidate configurations the walk-forward test compared</h3>
-      <p class="sub">Five ways to price the same protocols, each calibrated on the training folds only and scored on protocols it never saw. Mean held-out Spearman is the ranking test; the ratio column is the market-cap-to-TVL ratio test, and MdAPE is the median absolute error on market cap. The ratio is not predictable from these figures — every candidate scores near zero on it — and the ranking is carried by TVL scale: even TVL times one global median ranks held-out market caps at 0.23.</p>
-      <div class="mult-wrap"><table class="mult" id="cand-table">
-        <thead><tr><th scope="col">Configuration</th><th scope="col" class="num">Mcap Spearman</th><th scope="col" class="num">Ratio Spearman</th><th scope="col" class="num">MdAPE</th><th scope="col">Kept?</th></tr></thead>
-        <tbody></tbody>
-      </table></div>
-    </section>
+  <section class="card" id="method">
+    <h2>How the implied value is priced</h2>
+    <p>One function scores every row, from the snapshot&rsquo;s own figures — never from a hand-kept list of names. A protocol&rsquo;s implied value is its TVL times the multiple the market already pays for its category, adjusted for growth, maturity, chain breadth and youth.</p>
+    <p class="formula" id="formula-line"></p>
+    <p>Age is the time since the protocol was first listed, the best record of how long it has run with no token; an unlisted age uses 365 days. A protocol tracked under 90 days takes a 0.85x youth discount. Multiples are clamped to [0.02, 2]; a category needs 4 live protocols of its own, else it takes the global median of 0.169x.</p>
+    <h3>Category multiples, calibrated from this snapshot</h3>
+    <table class="data-table">
+      <thead><tr><th>Category</th><th class="num">Multiple</th><th class="num">Live protocols</th><th>Source</th></tr></thead>
+      <tbody id="multiples-body"></tbody>
+    </table>
+    <p id="recompute-note"></p>
+    <h3>Candidate configurations the walk-forward test compared</h3>
+    <p>Six ways to price the same protocols, each calibrated on the training folds only and scored on protocols it never saw. Mean held-out Spearman is the ranking test; the ratio column is the market-cap-to-TVL ratio test, and MdAPE is the median absolute error on market cap. The ranking is carried by TVL scale: even TVL times one global median ranks held-out market caps at 0.23. The ratio is not predictable from the multiple models — they score near zero on it — but the fitted log-regression is the first candidate that ranks the ratio (0.357), while losing the ranking test itself.</p>
+    <table class="data-table">
+      <thead><tr><th>Configuration</th><th class="num">Mcap Spearman</th><th class="num">Ratio Spearman</th><th class="num">MdAPE</th><th>Kept?</th></tr></thead>
+      <tbody id="candidates-body"></tbody>
+    </table>
+    <h3>Fitted launch pricing (radar-4)</h3>
+    <p>The fitted launch price is an ordinary least-squares fit of log market cap on log TVL, log age, chain count and seven-day change, over the 128 live protocols with a positive market cap, plus a per-category residual effect shrunk toward zero by n/(n+4). R&sup2; 0.216 — the features explain about a fifth of the log market cap — so the fitted price is a weak second estimate, and the board never ranks by it.</p>
+    <table class="data-table">
+      <thead><tr><th>Coefficient</th><th class="num">Value</th><th>What it means</th></tr></thead>
+      <tbody id="coefficients-body"></tbody>
+    </table>
+    <p id="effects-line"></p>
+  </section>
 
-    <footer class="foot">
-      <p>Implied value is this radar's own estimate, not a price and not a promise. “Records no token” means the snapshot records none — it is not proof a protocol has none. Farm plans are a starting point: check the protocol's own pages before you move funds.</p>
-    </footer>
-  </main>
+  <footer class="footer">
+    <p>Implied value is this radar&rsquo;s own estimate, not a price and not a promise. &ldquo;Records no token&rdquo; means the snapshot records none — it is not proof a protocol has none. Farm plans are a starting point: check the protocol&rsquo;s own pages before you move funds.</p>
+  </footer>
+</main>
+
+<div class="dialog-backdrop" id="dialog-backdrop" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-name" id="dialog">
+    <div class="dialog-head">
+      <p class="dialog-kicker" id="dialog-kicker"></p>
+      <button type="button" class="dialog-close" id="dialog-close">Close</button>
+    </div>
+    <h2 id="dialog-name"></h2>
+    <p class="dialog-sub" id="dialog-sub"></p>
+    <dl class="facts" id="dialog-facts"></dl>
+    <p id="dialog-recompute"></p>
+    <p id="dialog-fitted"></p>
+    <p id="dialog-verdict-rule"></p>
+    <h3>Farm plan</h3>
+    <ol class="farm-plan" id="dialog-plan"></ol>
+  </div>
 </div>
-
-<dialog class="detail" id="detail" aria-labelledby="detail-title"></dialog>
 
 <script src="../data.js"></script>
 <script src="app.js"></script>
