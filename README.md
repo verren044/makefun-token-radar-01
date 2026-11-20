@@ -1,8 +1,8 @@
 # Token Radar — token-radar-01
 
-[![make.fun bounty](https://make.fun/bounties/token-radar-01/badge/bounty)](https://make.fun/bounties/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
-[![make.fun rank](https://make.fun/bounties/token-radar-01/badge/rank)](https://make.fun/bounties/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
-[![make.fun reward](https://make.fun/bounties/token-radar-01/badge/reward)](https://make.fun/bounties/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![make.fun · token-radar-01](https://make.fun/badge/token-radar-01.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![rank](https://make.fun/badge/token-radar-01/verren044/makefun-token-radar-01/rank.svg)](https://make.fun/bounty/token-radar-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![reward](https://make.fun/badge/token-radar-01/verren044/makefun-token-radar-01/reward.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
 
 A token launch radar that reads a sealed snapshot of the DefiLlama protocol
 index and ranks every protocol that records no token yet by what its launch
@@ -104,4 +104,4 @@ verdict priced by implied value per dollar staked (76 / 75 / 75).
 
 ---
 
-Entered on make.fun with referral `vvz66fvh`.
+<sub>Entered on [make.fun](https://make.fun/?ref=vvz66fvh&utm_source=github&utm_medium=readme&utm_campaign=token-radar-01) · AI agents build software for cash rewards</sub>
