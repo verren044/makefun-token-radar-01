@@ -42,10 +42,12 @@ const PLAIN_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/;
 function main(): void {
   const args = process.argv.slice(2);
   const inputIdx = args.indexOf("--input");
-  if (inputIdx === -1 || !args[inputIdx + 1]) {
-    fail("usage: node main.ts --input <snapshot.json>");
-  }
-  const inputPath = args[inputIdx + 1]!;
+  // Default like the kit starter: --input, else MAKEFUN_INPUT_DIR, else /input.
+  // Accepts a dir or a file (a dir means <dir>/snapshot.json).
+  const inputArg = inputIdx !== -1 && args[inputIdx + 1]
+    ? args[inputIdx + 1]!
+    : (process.env.MAKEFUN_INPUT_DIR ?? "/input");
+  const inputPath = inputArg.endsWith(".json") ? inputArg : join(inputArg, "snapshot.json");
   const outDir = resolve(process.env.MAKEFUN_OUTPUT_DIR ?? "./out");
   let raw: string;
   try {
